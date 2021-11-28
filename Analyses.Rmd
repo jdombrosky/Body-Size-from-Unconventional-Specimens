@@ -1,0 +1,831 @@
+---
+title: "BODY SIZE FROM UNCONVENTIONAL SPECIMENS"
+author: "Jonathan Dombrosky | jdombrosky@crowcanyon.org"
+date: "10/22/2021"
+output:
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, dpi = 400)
+```
+
+# INTRODUCTION
+This Rmarkdown file is organized into six major sections: Introduction, Packages Needed, Validating Centroid Size-Based Body Size Reconstruction, Archaeological Body Size Estimations, Modern Comparisons, and Intra- Interindividual Error Testing. This file corresponds to analyses and figures produced in the manuscript *Body Size from Unconventional Specimens*. However, it also provides supplemental figures and analyses not presented in the body of the manuscript. All data are directly imported from their most raw formats (housed in corresponding folders in this Supplemental file) so that data manipulation is explicit and analyses are reproducible. The section *INTRA- AND INTERINDIVIDUAL ERROR TESTING* and the subsection *Error Associated with SL to TL Length-Length Conversion* are referenced to in the manuscript but statistical analyses and interpretation are presented here.
+
+# PACKAGES NEEDED
+```{r, message = FALSE}
+library(geomorph)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(effectsize)
+library(ggrepel)
+```
+# VALIDATING CENTROID SIZE-BASED BODY SIZE RECONSTRUCTION
+```{r}
+mydata <-read.table(
+  "Validating Centroid Size/Vertebra_Analysis_Centroid.txt", header=TRUE, 
+  row.names=1, stringsAsFactors = FALSE)
+
+body.size <- read.table("Basic Files/Body_Size.txt", header=TRUE)
+
+width <- read.table("Validating Centroid Size/Vertebra_Analysis_Width.txt",
+                    header=TRUE)
+
+species <- read.table("Basic Files/Species.txt", header=TRUE)
+
+a <-arrayspecs(mydata, ncol(mydata)/3, 3)
+
+mydata.gpa <- gpagen(a, curves = NULL, surfaces = NULL, PrinAxes = TRUE, 
+                     max.iter = NULL, ProcD = TRUE, Proj = TRUE, 
+                     print.progress = FALSE)
+
+centroid.df <- data.frame(mydata.gpa$Csize)
+centroid.df <- tibble::rownames_to_column(centroid.df, "ID")
+
+centroid.clean <- centroid.df %>% 
+  separate("ID", into = c("ID", "Vert_Num")) %>%
+  merge(body.size, by="ID") %>%
+  dplyr::rename(Csize = mydata.gpa.Csize)
+
+centroid.clean.width <- width %>% 
+  separate("ID", into = c("ID", "Vert_Num")) %>%
+  merge(centroid.clean, by= c("ID", "Vert_Num"))
+
+lm1 <- lm(data = centroid.clean.width, SL ~ Width)
+
+lm2 <- lm(data = centroid.clean, SL ~ Csize)
+
+full.dataset <- centroid.clean.width %>%
+  mutate(Size.Centroid = (lm2$coefficients[[2]]*Csize)+lm2$coefficients[[1]],
+         Size.Width = (lm1$coefficients[[2]]*Width)+lm1$coefficients[[1]],
+         PE.Centroid = ((SL - Size.Centroid)*100)/Size.Centroid,
+         PE.Width = ((SL - Size.Width)*100)/Size.Width)
+
+MPE <- full.dataset %>%
+  group_by(ID) %>%
+  dplyr::summarize(MPE.Centroid = mean(PE.Centroid),
+                   MPE.Width = mean(PE.Width))
+```
+## Standard Length and Centrum Width
+```{r, fig.width = 7, fig.height = 5}
+p <- ggplot(data = full.dataset, mapping = aes(x = Width, y = SL))
+
+p + geom_point(aes(color = ID), alpha = 0.5, size = 3) + 
+  geom_smooth(formula = y ~ x, method = "lm", size = 1.25, 
+              color = "#4d4d4d") +
+  theme_classic() +
+  ylim(166, 500) +
+  annotate("text", x = Inf, y = 166, 
+           label =
+             "paste(italic(R^2), \" = .91 \")",
+           parse = T, hjust = 1, vjust = 0, color = "#4d4d4d") +
+  labs(x = "Centrum Width (mm)", y = "Standard Length (mm)") +
+  theme(legend.position = "none",
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1))
+
+summary(lm(data = full.dataset, SL ~ Width))
+```
+
+## Standard Length and Centroid Size
+```{r, fig.width = 7, fig.height = 5}
+p <- ggplot(data = full.dataset, mapping = aes(x = Csize, y = SL))
+p + geom_point(aes(color = ID), alpha = 0.5, size = 3) + 
+  geom_smooth(formula = y ~ x, method = "lm", size = 1.25, 
+              color = "#4d4d4d") +
+  theme_classic() +
+  ylim(166, 500) +
+  annotate("text", x = Inf, y = 166, 
+           label = 
+             "paste(italic(R^2), \" = .86 \")",
+           parse = T, hjust = 1, vjust = 0, color = "#4d4d4d") +
+  labs(x = "Centroid Size", y = "Standard Length (mm)") +
+  theme(legend.position = "none",
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1))
+
+summary(lm(data = full.dataset, SL ~ Csize))
+```
+
+## Centrum Width Estimation and Centroid Size Estimation
+```{r, fig.width = 7, fig.height = 5}
+p <- ggplot(data = full.dataset, mapping = aes(x = Size.Centroid, 
+                                                y = Size.Width))
+p + geom_point(aes(color = ID), alpha = 0.5, size = 3) + 
+  geom_smooth(formula = y ~ x, method = "lm", size = 1.25, 
+              color = "#4d4d4d") +
+  theme_classic() +
+  annotate("text", x = Inf, y = 160, 
+           label = "paste(italic(R^2), \" = .94 \")",
+           parse = T, hjust = 1, vjust = 0, color = "#4d4d4d") +
+  labs(x = "Centroid Size Estimated Standard Length (mm)", 
+       y = "Centrum Width Estimated Standard Length (mm)") +
+  theme(legend.position = "none",
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 13.5, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 13.5, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1))
+
+summary(lm(data = full.dataset, Size.Width ~ Size.Centroid))
+```
+
+## Predicion Error (PE)
+```{r, fig.width = 7, fig.height = 5, warning = FALSE}
+p <- ggplot(data = full.dataset, 
+            mapping = aes(x = PE.Centroid, y = PE.Width))
+p + geom_point(aes(color = ID), alpha = 0.5, size = 3) + 
+  geom_smooth(formula = y ~ x, method = "lm", size = 1.25, 
+              color = "#4d4d4d") +
+  theme_classic() +
+  annotate("text", x = Inf, y = -15, 
+           label = "paste(italic(R^2), \" = .56 \")",
+           parse = T, hjust = 1, vjust = 0, color = "#4d4d4d") +
+  labs(x = "PE Centroid Size", y = "PE Centrum Width") +
+  theme(legend.position="none",
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1))
+
+summary(lm(data = full.dataset, PE.Width ~ PE.Centroid))
+```
+
+## Mean Prediction Error (MPE)
+```{r, fig.width = 7, fig.height = 5}
+p <- ggplot(data = MPE, mapping = aes(x = MPE.Centroid, y = MPE.Width))
+p + geom_point(aes(color = ID), alpha = 0.5, size = 3) + 
+  geom_smooth(formula = y ~ x, method = "lm", size = 1.25, 
+              color = "#4d4d4d") +
+  theme_classic() +
+  annotate("text", x = Inf, y = -15, 
+           label = "paste(italic(R^2), \" = .63 \")",
+           parse = T, hjust = 1, vjust = 0, color = "#4d4d4d") +
+  labs(x = "MPE Centroid Size", y = "MPE Centrum Width") +
+  theme(legend.position="none",
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1))
+
+summary(lm(data = MPE, MPE.Width ~ MPE.Centroid))
+```
+
+# ARCHAEOLOGICAL BODY SIZE ESTIMATIONS
+```{r, warning = FALSE}
+setwd("Archaeological Estimates")
+files    <- list.files(pattern = "\\.txt$")
+results  <- data.frame()
+
+for (i in seq_along(files)) {
+  fname <- paste(files[i], sep="/")
+  
+  data <- read.table(fname, header = T, row.names = 1, 
+                     stringsAsFactors = FALSE)
+  
+  a <-arrayspecs(data, ncol(data)/3, 3)
+  
+  mydata.gpa <- gpagen(a, curves = NULL, surfaces = NULL, PrinAxes = TRUE, 
+                       max.iter = NULL, 
+       ProcD = TRUE, Proj = TRUE, print.progress = FALSE)
+  
+  centroid.df <- data.frame(mydata.gpa$Csize)
+  centroid.df <- tibble::rownames_to_column(centroid.df, "ID")
+  
+  centroid.clean <- centroid.df %>% 
+  separate("ID", into = "ID") %>%
+  merge(body.size, by="ID") %>%
+  dplyr::rename(Csize = mydata.gpa.Csize)
+  
+  fit1 <- summary(lm(data = centroid.clean, SL ~ Csize))
+  
+  fit2 <- cor.test(centroid.clean$SL, centroid.clean$Csize,  
+                   method = "spearman")
+  
+  Arch_Size <- (fit1$coefficients[[2]]*mydata.gpa$Csize[[1]])+
+    fit1$coefficients[[1]]
+
+  
+  results[i,1] <- fit1$coefficients[2]
+  results[i,2] <- mydata.gpa$Csize[[1]]
+  results[i,3] <- fit1$coefficients[1]
+  results[i,4] <- fit1$r.squared
+  results[i,5] <- (fit2$estimate)^2
+  results[i,6] <- Arch_Size
+}
+
+rownames(results) <- sub(".txt", "", files)
+colnames(results) <- c("Slope", "Csize", "Intercept", "R2", "Rho2",
+                       "Arch_SL")
+
+round(results, digits = 2)
+```
+*Visualize Archaeological Distribution*
+```{r, fig.width = 7, fig.height = 5}
+results %>%
+  ggplot(aes(Arch_SL)) +
+  geom_density(fill = "#00bfc4", color = "#00bfc4", bw = 50, alpha = 0.5, 
+               size = 1.5) +
+  theme_classic() +
+  theme(legend.position="none",
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        plot.title = element_text(color = "#4d4d4d", size = 16, 
+                                  face = "bold"),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1)) +
+        labs(title = "Archaeological Size Distribution", 
+             x = "Standard Length (mm)", y = "Density") +
+    xlim(0, 700)
+```
+
+# MODERN COMPARISONS
+## Total Length (TL)
+A length-length conversion factor from Standard Length (SL) to Total Length (TL) was applied to the archaeological SL estimates. All modern comparison data uses TL. TL could not be estimated per archaeological specimen considering that two specimens from the Museum of Southwestern Biology comparative library (25273, 50002, and 50003) do not have TL measurements. A SL to TL conversion factor of 1.27 was chosen by calculating the mean values available for *Ictiobus bubalus* and *Carpiodes carpio* on fishbase.de. Available here:
+https://www.fishbase.de/popdyn/LLRelationshipList.php?ID=2992&GenusName=Ictiobus&SpeciesName=bubalus&fc=125
+https://www.fishbase.de/popdyn/LLRelationshipList.php?ID=2957&GenusName=Carpiodes&SpeciesName=carpio&fc=125
+```{r, fig.width = 7, fig.height = 5}
+# convert archaeological SL to TL
+results <- mutate(results, Arch_TL = Arch_SL*1.27)
+
+# visualize archaeological distribution
+results %>% 
+  ggplot(aes(Arch_TL)) +
+  geom_density(fill = "#00bfc4", color = "#00bfc4", bw = 50, alpha = 0.5, 
+               size = 1.5) +
+  theme_classic() +
+  theme(legend.position="none",
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        plot.title = element_text(color = "#4d4d4d", size = 16, 
+                                  face = "bold"),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1)) +
+        labs(title = "Archaeological Size Distribution", 
+             x = "Total Length (mm)", y = "Density") +
+    xlim(100, 900)
+
+```
+
+## Error Associated with SL to TL Length-Length Conversion
+`TL` and `TL_estimate` of specimens from the comparative library are almost perfectly correlated (*R^2^* = 0.99; *rho* = 1). This means that error associated with the TL conversion factor (1.27) is extremely low. Further, the conversion factor will underestimate TL if there is error. This can be seen by visually inspecting the graph below.  
+```{r, fig.width=7, fig.height=5}
+body.size.estimate <- body.size %>%
+  na.omit() %>%
+  mutate(TL_estimate = SL * 1.27)
+
+p <- ggplot(data = body.size.estimate, 
+            mapping = aes(x = TL_estimate, y = TL))
+p + geom_point(alpha = 0.5, size = 4) + 
+  geom_smooth(formula = y ~ x, method = "lm", size = 1.25, 
+              color = "#4d4d4d") +
+  annotate("text", x = 400, y = 215, 
+           label = "paste(italic(R) ^ 2, \" = .99, \", italic(rho),
+           \" = 1 \")",
+           parse = T, hjust = 1, vjust = 0, color = "#4d4d4d") +
+  theme_classic() +
+  labs(x = "Estimated Total Length (mm)", y = "Actual Total Length (mm)") +
+  theme(legend.position="none",
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1))
+
+summary(lm(data = body.size.estimate, TL ~ TL_estimate))
+
+rho <-cor.test(body.size.estimate$TL, body.size.estimate$TL_estimate,  
+               method = "spearman")
+rho
+```
+
+## Calculating Modern Comparison
+*Archaeological Estimates*
+```{r}
+# specify breaks
+breaks <- c(-Inf,200,250,300,350,400,450,500,550,Inf)
+
+# specify bin labels
+tags <- c("-199", "200-249", "250-299", "300-349", "350-399","400-449", 
+          "450-499","500-549", "550+")
+
+# put values into bins
+group_tags <- cut(results$Arch_TL, 
+                  breaks=breaks,
+                  include.lowest=TRUE, 
+                  right=FALSE,
+                  labels=tags)
+
+# plot
+a <- as_tibble(summary(group_tags), rownames = "bins") %>%
+  dplyr::rename(count = value) %>%
+  mutate(percent = (count/sum(count)*100)) %>%
+  dplyr::select(bins, percent) %>%
+  mutate(time = "Archaeological")
+```
+*Moody (1970)*
+```{r}
+# overall percentages (1967-1970) reported in Table 4 
+b <- tibble(bins = c("-199", "200-249", "250-299", "300-349", "350-399", 
+                     "400-449", "450-499","500-549", "550+"), 
+          percent = c(0, 2, 3, 11, 15, 21, 36, 11, 1)) %>%
+  mutate(time = "Commercial")
+```
+*NM Game and Fish*
+```{r}
+NMgamefish <- read.table("Modern Comparison/NM Game and Fish.txt", 
+                         header = TRUE)
+
+# specify breaks
+breaks <- c(-Inf, 200, 250, 300, 350, 400, 450, 500, 550, Inf)
+# specify bin labels
+tags <- c("-199", "200-249", "250-299", "300-349", "350-399","400-449", 
+          "450-499","500-549", "550+")
+# puttingvalues into bins
+group_tags <- cut(NMgamefish$TL, 
+                  breaks=breaks,
+                  include.lowest=TRUE, 
+                  right=FALSE,
+                  labels=tags)
+
+# plot
+c <- as_tibble(summary(group_tags), rownames = "bins") %>%
+  dplyr::rename(count = value) %>%
+  mutate(percent = (count/sum(count)*100)) %>%
+  dplyr::select(bins, percent) %>%
+  mutate(time = "Non_Commercial")
+```
+*Bind Together and Plot*
+```{r, fig.width = 4, fig.height = 9}
+d <- rbind(a, b, c)
+
+d$time <- factor(d$time, levels = c("Commercial", "Non_Commercial", 
+                                    "Archaeological"))
+
+d$time2 <- factor(d$time, 
+                  labels = c("Commercial Fishery (1967–1970)", 
+                             "Non-Commercial Fishery (2011–2017)",
+                             "Archaeological Fishery (ca. AD 1300-1600)"))
+
+ggplot(d, aes(x = bins, y = percent)) +
+  geom_bar(stat = "identity", size = 1.5) +
+  facet_wrap(~ time2, nrow = 3) +
+  scale_y_continuous(breaks = seq(0, 45, by = 15)) +
+  theme_classic() +
+  theme(legend.position="top",
+        strip.text.x = element_text(color = "#4d4d4d", size = 12, 
+                                    face = "bold"),
+        strip.background = element_rect(color= NA, fill= NA),
+        legend.title = element_blank(),
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        axis.text.x = element_text(color = "#4d4d4d", size = 7),
+        axis.text.y = element_text(color = "#4d4d4d", size = 8),
+        axis.title.x = element_text(color = "#4d4d4d", size = 10, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 10, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1)) +
+        labs(x = "Total Length (mm)", y = "Percent (%)")
+```
+
+# INTRA- AND INTERINDIVIDUAL ERROR TESTING
+## Intraobserver Error
+*Analyst 1 (Alexandra Harris)*
+
+Run a Generalized Procrustes Analysis for all Analyst 1 datafiles. Each .txt file pertains to a specimen and contains five replicate landmark configurations
+```{r, warning = FALSE}
+setwd("Error Testing/Alex")
+files    <- list.files(pattern = "\\.txt$")
+my.list <- list()
+
+for (i in seq_along(files)) {
+  fname <- paste(files[i], sep="/")
+  
+  data <- read.table(fname, header = T, row.names = 1, 
+                     stringsAsFactors = FALSE)
+  
+  a <-arrayspecs(data, ncol(data)/3, 3)
+  
+  mydata.gpa <- gpagen(a, curves = NULL, surfaces = NULL, PrinAxes = TRUE, 
+                       max.iter = NULL, 
+       ProcD = TRUE, Proj = TRUE, print.progress = FALSE)
+  
+my.list[[i]] <- mydata.gpa
+}
+```
+Establish number of rows in each landmark configuration
+```{r}
+rows <- rep(NA, 60)
+for(i in seq_along(my.list)){
+  rows[i] <- dim(my.list[[i]][["coords"]])[1]
+}
+```
+Create lists out of all coordinates per replicate per specimen and all consensuses per specimen
+```{r}
+# initiate
+coords <- list()
+for(i in 1:60){
+  coords[[i]] <- array(NA, dim = c(rows[i], 3, 5))
+}
+
+# isolate coordinates per specimen per analyst per replicate
+for(i in seq_along(my.list)){
+  for(j in 1:5){
+  coords[[i]][,,j] <- my.list[[i]][["coords"]][,,j]
+  }
+}
+
+# initiate
+consensus <- list()
+
+# isolate consensus per specimen
+for(i in seq_along(my.list)){
+  consensus[[i]] <- my.list[[c(i, 4)]]
+}
+```
+Calculate `procd` (`procd` = total Procrustes distance from consensus)
+```{r}
+# initiate
+output1 <- list()
+for(i in 1:60){
+  output1[[i]] <- array(NA, dim = c(rows[i], 3, 5))
+}
+
+# subtract and square
+for(i in seq_along(coords)){
+  for(j in 1:5){
+    output1[[i]][,,j] <- (coords[[i]][,,j] - consensus[[i]])^2
+  }
+}
+
+# initiate
+output2 <- list()
+for(i in 1:60){
+  output2[[i]] <- array(NA, dim = c(1, rows[i], 5))
+}
+
+# sum rows
+for(i in seq_along(output1)){
+  for(j in 1:5){
+    output2[[i]][,,j] <- rowSums(output1[[i]][,,j])
+  }
+}
+
+# initiate
+procd <- list()
+for(i in 1:60){
+  procd[[i]] <- array(NA, dim = c(1, 1, 5))
+}
+
+# sum and square root
+for(i in 1:60){
+  for(j in 1:5){
+    procd[[i]][,,j] <- sqrt(sum(output2[[i]][,,j]))
+  }
+}
+```
+Transform `procd` and assign to Analyst 1
+```{r}
+# create dataframe
+procd <- data.frame(unlist(procd))
+
+#subset data for Analyst 1 and transform
+analyst1.procd <- procd %>%
+  mutate(analyst = "Analyst 1",
+         replicate = rep(c("1", "2", "3", "4", "5"), times = 60)) %>%
+  rename(procd = colnames(procd)[1])
+```
+*Analyst 2 (Jonathan Dombrosky)*
+
+Run a Generalized Procrustes Analysis for all Analyst 2 datafiles. Each .txt file pertains to a specimen and contains five replicate landmark configurations
+```{r, warning = FALSE}
+setwd("Error Testing/Jon")
+files    <- list.files(pattern = "\\.txt$")
+my.list <- list()
+
+for (i in seq_along(files)) {
+  fname <- paste(files[i], sep="/")
+  
+  data <- read.table(fname, header = T, row.names = 1, 
+                     stringsAsFactors = FALSE)
+  
+  a <-arrayspecs(data, ncol(data)/3, 3)
+  
+  mydata.gpa <- gpagen(a, curves = NULL, surfaces = NULL, PrinAxes = TRUE, 
+                       max.iter = NULL, 
+       ProcD = TRUE, Proj = TRUE, print.progress = FALSE)
+  
+my.list[[i]] <- mydata.gpa
+}
+```
+Establish number of rows in each landmark configuration
+```{r}
+rows <- rep(NA, 60)
+for(i in seq_along(my.list)){
+  rows[i] <- dim(my.list[[i]][["coords"]])[1]
+}
+```
+Create lists out of all coordinates per replicate per specimen and all consensuses per specimen
+```{r}
+# initiate
+coords <- list()
+for(i in 1:60){
+  coords[[i]] <- array(NA, dim = c(rows[i], 3, 5))
+}
+
+# isolate coordinates per specimen per analyst per replicate
+for(i in seq_along(my.list)){
+  for(j in 1:5){
+  coords[[i]][,,j] <- my.list[[i]][["coords"]][,,j]
+  }
+}
+
+# initiate
+consensus <- list()
+
+# isolate consensus per specimen
+for(i in seq_along(my.list)){
+  consensus[[i]] <- my.list[[c(i, 4)]]
+}
+```
+Calculate `procd` (`procd` = total Procrustes distance from consensus)
+```{r}
+# initiate
+output1 <- list()
+for(i in 1:60){
+  output1[[i]] <- array(NA, dim = c(rows[i], 3, 5))
+}
+
+# subtract and square
+for(i in seq_along(coords)){
+  for(j in 1:5){
+    output1[[i]][,,j] <- (coords[[i]][,,j] - consensus[[i]])^2
+  }
+}
+
+# initiate
+output2 <- list()
+for(i in 1:60){
+  output2[[i]] <- array(NA, dim = c(1, rows[i], 5))
+}
+
+# sum rows
+for(i in seq_along(output1)){
+  for(j in 1:5){
+    output2[[i]][,,j] <- rowSums(output1[[i]][,,j])
+  }
+}
+
+# initiate
+procd <- list()
+for(i in 1:60){
+  procd[[i]] <- array(NA, dim = c(1, 1, 5))
+}
+
+# sum and square root
+for(i in 1:60){
+  for(j in 1:5){
+    procd[[i]][,,j] <- sqrt(sum(output2[[i]][,,j]))
+  }
+}
+```
+Transform `procd` and assign to Analyst 2
+```{r}
+# create dataframe
+procd <- data.frame(unlist(procd))
+
+#subset data for Analyst 1 and transform
+analyst2.procd <- procd %>%
+  mutate(analyst = "Analyst 2",
+         replicate = rep(c("1", "2", "3", "4", "5"), times = 60)) %>%
+  rename(procd = colnames(procd)[1])
+```
+Bind Analyst 1 and Analyst 2 datasets
+```{r}
+procd <- rbind(analyst1.procd, analyst2.procd)
+```
+*Visualize and Significance Testing*
+
+One way ANOVA tests indicate that the mean values of `procd` are equal between replicates for Analyst 1 (*p* = 0.91) and Analyst 2 (*p* = 0.31). Further, the effect size between replicates is extremely small for Analyst 1 (*Eta^2^* < 0.01) and Analyst 2 (*Eta^2^* = 0.02). The landmarking configurations on the entire archaeological dataset are practically indistinguishable between replicates of the same analyst.
+```{r, fig.width = 7, fig.height = 10}
+procd %>%
+  ggplot(mapping = aes(x = replicate, y = procd, group = replicate, 
+                       fill = replicate, color = replicate)) +
+  geom_boxplot(size = 0.75, alpha = 0.5, outlier.alpha = 0.5, 
+               outlier.size = 2.5) +
+  facet_wrap(~ analyst, nrow = 2) +
+  theme_classic() +
+  theme(legend.position= "none",
+        strip.background = element_blank(),
+        strip.text.x = element_text(color = "#4d4d4d", size = 16, 
+                                    face = "bold"),
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1)) +
+        labs(x = "Replicate", y = "Total Procrustes Distance\n 
+             from Consensus")
+
+oneway.analyst1 <- aov(procd ~ replicate, data = analyst1.procd)
+summary(oneway.analyst1)
+eta_squared(oneway.analyst1)
+
+oneway.analyst2 <- aov(procd ~ replicate, data = analyst2.procd)
+summary(oneway.analyst2)
+eta_squared(oneway.analyst2)
+```
+
+## Interobserver Error
+Run a Generalized Procrustes Analysis for all datafiles (both Analyst 1 and Analyst 2 combined). Each .txt file pertains to a specimen and contains five replicate landmark configurations per analyst.
+```{r, warning = FALSE}
+setwd("Error Testing/Both")
+files    <- list.files(pattern = "\\.txt$")
+my.list <- list()
+
+for (i in seq_along(files)) {
+  fname <- paste(files[i], sep="/")
+  
+  data <- read.table(fname, header = T, row.names = 1, 
+                     stringsAsFactors = FALSE)
+  
+  a <-arrayspecs(data, ncol(data)/3, 3)
+  
+  mydata.gpa <- gpagen(a, curves = NULL, surfaces = NULL, PrinAxes = TRUE, 
+                       max.iter = NULL, 
+       ProcD = TRUE, Proj = TRUE, print.progress = FALSE)
+  
+my.list[[i]] <- mydata.gpa
+}
+```
+Establish number of rows in each landmark configuration
+```{r}
+rows <- rep(NA, 60)
+for(i in seq_along(my.list)){
+  rows[i] <- dim(my.list[[i]][["coords"]])[1]
+}
+```
+Create lists out of all coordinates per replicate per analyst per specimen and all consensuses per specimen
+```{r}
+# initiate
+coords <- list()
+for(i in 1:60){
+  coords[[i]] <- array(NA, dim = c(rows[i], 3, 10))
+}
+
+# isolate coordinates per specimen per analyst per replicate
+for(i in seq_along(my.list)){
+  for(j in 1:10){
+  coords[[i]][,,j] <- my.list[[i]][["coords"]][,,j]
+  }
+}
+
+# initiate
+consensus <- list()
+
+# isolate consensus per specimen
+for(i in seq_along(my.list)){
+  consensus[[i]] <- my.list[[c(i, 4)]]
+}
+```
+Calculate `procd` (`procd` = total Procrustes distance from consensus)
+```{r}
+# initiate
+output1 <- list()
+for(i in 1:60){
+  output1[[i]] <- array(NA, dim = c(rows[i], 3, 10))
+}
+
+# subtract and square
+for(i in seq_along(coords)){
+  for(j in 1:10){
+    output1[[i]][,,j] <- (coords[[i]][,,j] - consensus[[i]])^2
+  }
+}
+
+# initiate
+output2 <- list()
+for(i in 1:60){
+  output2[[i]] <- array(NA, dim = c(1, rows[i], 10))
+}
+
+# sum rows
+for(i in seq_along(output1)){
+  for(j in 1:10){
+    output2[[i]][,,j] <- rowSums(output1[[i]][,,j])
+  }
+}
+
+# initiate
+procd <- list()
+for(i in 1:60){
+  procd[[i]] <- array(NA, dim = c(1, 1, 10))
+}
+
+# sum and square root
+for(i in 1:60){
+  for(j in 1:10){
+    procd[[i]][,,j] <- sqrt(sum(output2[[i]][,,j]))
+  }
+}
+```
+Transform `procd`
+```{r}
+# create dataframe
+procd <- data.frame(unlist(procd))
+
+#subset data for Analyst 1 and transform
+analyst1.procd <- data.frame(procd[c(rep(TRUE, 5), rep(FALSE, 5)),])
+
+analyst1.procd <- analyst1.procd %>%
+  mutate(analyst = "1") %>%
+  rename(procd = colnames(analyst1.procd)[1])
+
+#subset data for Analyst 2 and transform
+analyst2.procd <- data.frame(procd[c(rep(FALSE, 5), rep(TRUE, 5)),])
+
+analyst2.procd <- analyst2.procd %>%
+  mutate(analyst = "2") %>%
+  rename(procd = colnames(analyst2.procd)[1])
+
+#bind transformed datasets for Analyst 1 and 2
+procd <- rbind(analyst1.procd, analyst2.procd)
+```
+*Visualize and Significance Testing*
+
+An independent t-test indicates that the mean values of `procd` between Analyst 1 and Analyst 2 are equal (*p* = 0.89). Further, the effect size between the two means is extremely small (*Cohen's d* = 0.01). The landmarking configuration on the entire archaeological dataset (replicated five times) is practically indistinguishable between Analyst 1 and Analyst 2. 
+```{r, fig.width = 7, fig.height = 5}
+procd %>%
+  ggplot(mapping = aes(x = analyst, y = procd, group = analyst, 
+                       fill = analyst, color = analyst)) +
+  geom_boxplot(size = 0.75, alpha = 0.5, outlier.alpha = 0.5, 
+               outlier.size = 2.5) +
+  theme_classic() +
+  theme(legend.position= "none",
+        strip.background = element_blank(),
+        strip.text.x = element_text(color = "#4d4d4d", size = 16, 
+                                    face = "bold"),
+        axis.line = element_line(color = "#4d4d4d", size = 1),
+        axis.text.x = element_text(color = "#4d4d4d", size = 12),
+        axis.text.y = element_text(color = "#4d4d4d", size = 12),
+        axis.title.x = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.title.y = element_text(color = "#4d4d4d", size = 14, 
+                                    face = "bold"),
+        axis.ticks.x = element_line(color = "#4d4d4d", size = 1),
+        axis.ticks.y = element_line(color = "#4d4d4d", size = 1)) +
+        labs(x = "Analyst", y = "Total Procrustes Distance\n from Consensus")
+
+t.test <- t.test(analyst1.procd$procd, analyst2.procd$procd)
+t.test
+cohens_d(t.test)
+```
