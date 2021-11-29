@@ -276,7 +276,7 @@ results %>%
 
 # MODERN COMPARISONS
 ## Total Length (TL)
-A length-length conversion factor from Standard Length (SL) to Total Length (TL) was applied to the archaeological SL estimates. All modern comparison data uses TL. TL could not be estimated per archaeological specimen considering that two specimens from the Museum of Southwestern Biology comparative library (25273, 50002, and 50003) do not have TL measurements. A SL to TL conversion factor of 1.27 was chosen by calculating the mean values available for *Ictiobus bubalus* and *Carpiodes carpio* on fishbase.de. Available here:
+A length-length conversion factor from Standard Length (SL) to Total Length (TL) was applied to the archaeological SL estimates. All modern comparison data uses TL. TL could not be estimated per archaeological specimen considering that three specimens from the Museum of Southwestern Biology comparative library (25273, 50002, and 50003) do not have TL measurements. A SL to TL conversion factor of 1.27 was chosen by calculating the mean values available for *Ictiobus bubalus* and *Carpiodes carpio* on fishbase.de. Available here:
 https://www.fishbase.de/popdyn/LLRelationshipList.php?ID=2992&GenusName=Ictiobus&SpeciesName=bubalus&fc=125
 https://www.fishbase.de/popdyn/LLRelationshipList.php?ID=2957&GenusName=Carpiodes&SpeciesName=carpio&fc=125
 ```{r, fig.width = 7, fig.height = 5}
